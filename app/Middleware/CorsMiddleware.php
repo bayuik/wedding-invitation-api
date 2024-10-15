@@ -17,7 +17,6 @@ final class CorsMiddleware implements MiddlewareInterface
 
         $header = respond()->getHeader();
         $header->set('Access-Control-Allow-Origin', '*');
-        $header->set('Access-Control-Allow-Methods', 'POST,PATCH,OPTIONS');
         $header->set('Access-Control-Expose-Headers', 'Authorization, Content-Type, Cache-Control, Content-Disposition');
 
         $vary = $header->has('Vary') ? explode(', ', $header->get('Vary')) : [];
@@ -33,6 +32,12 @@ final class CorsMiddleware implements MiddlewareInterface
         if (!$request->server->has('HTTP_ACCESS_CONTROL_REQUEST_METHOD')) {
             return respond()->setCode(Respond::HTTP_NO_CONTENT);
         }
+        $header->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        $header->set('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, Access-Control-Allow-Origin');
+        if ($request->method() === Request::OPTIONS) {
+            return respond()->setCode(Respond::HTTP_NO_CONTENT);
+        }
+
 
         $header->set(
             'Access-Control-Allow-Methods',
