@@ -11,18 +11,38 @@ final class CorsMiddleware implements MiddlewareInterface
 {
     public function handle(Request $request, Closure $next)
     {
-        // Allow all origins and disable any CORS validation
-        $header = respond()->getHeader();
-        $header->set('Access-Control-Allow-Origin', '*'); // Allow any origin
-        $header->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS'); // Allow all HTTP methods
-        $header->set('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Requested-With'); // Allow common headers
-        $header->set('Access-Control-Allow-Credentials', 'true'); // Allow credentials if needed
-
-        // Preflight request handling (OPTIONS)
-        if ($request->method(Request::OPTIONS)) {
-            return respond()->setCode(Respond::HTTP_NO_CONTENT); // 204 No Content for OPTIONS requests
+        if (!$request->ajax() && !$request->method(Request::OPTIONS)) {
+            return $next($request);
         }
 
-        return $next($request); // Continue to next middleware if not OPTIONS
+        $header = respond()->getHeader();
+        $header->set('Access-Control-Allow-Origin', '*');
+        $header->set('Access-Control-Expose-Headers', 'Authorization, Content-Type, Cache-Control, Content-Disposition');
+
+        $vary = $header->has('Vary') ? explode(', ', $header->get('Vary')) : [];
+        $vary = array_unique([...$vary, 'Accept', 'Origin', 'User-Agent', 'Access-Control-Request-Method', 'Access-Control-Request-Headers']);
+        $header->set('Vary', join(', ', $vary));
+
+        if (!$request->method(Request::OPTIONS)) {
+            return $next($request);
+        }
+
+        $header->unset('Content-Type');
+
+        if (!$request->server->has('HTTP_ACCESS_CONTROL_REQUEST_METHOD')) {
+            return respond()->setCode(Respond::HTTP_NO_CONTENT);
+        }
+
+        $header->set(
+            'Access-Control-Allow-Methods',
+            strtoupper($request->server->get('HTTP_ACCESS_CONTROL_REQUEST_METHOD', $request->method()))
+        );
+
+        $header->set(
+            'Access-Control-Allow-Headers',
+            $request->server->get('HTTP_ACCESS_CONTROL_REQUEST_HEADERS', 'Origin, Content-Type, Accept, Authorization, Accept-Language')
+        );
+
+        return respond()->setCode(Respond::HTTP_NO_CONTENT);
     }
 }
