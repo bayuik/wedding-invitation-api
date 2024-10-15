@@ -11,30 +11,38 @@ final class CorsMiddleware implements MiddlewareInterface
 {
     public function handle(Request $request, Closure $next)
     {
+        if (!$request->ajax() && !$request->method(Request::OPTIONS)) {
+            return $next($request);
+        }
+
         $header = respond()->getHeader();
-
-        // Allow any origin
         $header->set('Access-Control-Allow-Origin', '*');
-
-        // Expose headers
         $header->set('Access-Control-Expose-Headers', 'Authorization, Content-Type, Cache-Control, Content-Disposition');
 
-        // Handle Vary header
         $vary = $header->has('Vary') ? explode(', ', $header->get('Vary')) : [];
         $vary = array_unique([...$vary, 'Accept', 'Origin', 'User-Agent', 'Access-Control-Request-Method', 'Access-Control-Request-Headers']);
         $header->set('Vary', join(', ', $vary));
 
-        // Allow methods
-        $header->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        if (!$request->method(Request::OPTIONS)) {
+            return $next($request);
+        }
 
-        // Allow headers
-        $header->set('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, Access-Control-Allow-Origin');
+        $header->unset('Content-Type');
 
-        // Handle preflight requests (OPTIONS method)
-        if ($request->method() === Request::OPTIONS) {
+        if (!$request->server->has('HTTP_ACCESS_CONTROL_REQUEST_METHOD')) {
             return respond()->setCode(Respond::HTTP_NO_CONTENT);
         }
 
-        return $next($request);
+        $header->set(
+            'Access-Control-Allow-Methods',
+            strtoupper($request->server->get('HTTP_ACCESS_CONTROL_REQUEST_METHOD', $request->method()))
+        );
+
+        $header->set(
+            'Access-Control-Allow-Headers',
+            $request->server->get('HTTP_ACCESS_CONTROL_REQUEST_HEADERS', 'Origin, Content-Type, Accept, Authorization, Accept-Language')
+        );
+
+        return respond()->setCode(Respond::HTTP_NO_CONTENT);
     }
 }
